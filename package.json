@@ -34,7 +34,7 @@
     "qrcode": "^1.5.4",
     "supabase": "2.119.0",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.48.1",
+    "typescript-eslint": "8.72.1",
     "vitest": "3.2.4"
   },
   "engines": {
