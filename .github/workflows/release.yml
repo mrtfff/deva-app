@@ -1,0 +1,145 @@
+name: Release
+
+# vX.Y.Z etiketi (veya workflow_dispatch ile etiket girişi) push'ını görünce çalışır:
+#   1. version:check + typecheck + lint + testler (fail-fast)
+#   2. APK derle → SHA256SUMS.txt ile birlikte GitHub Release'e yükle
+#   3. Docker imajını GHCR'a pushla (vX.Y.Z + latest)
+#
+# NOT: APK, android/ üretim çıktısındaki debug keystore ile imzalanır — bu imza
+# kurulum/dağıtım için geçerlidir, Play Store için değildir. Üretim anahtarı
+# için docs/RELEASE.md > "Üretim imzalama" bölümüne bakın.
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Sürüm etiketi (örn. v1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm approve-scripts esbuild || true
+      - run: npm run version:check
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test --workspace @deva/mobile
+
+  apk:
+    name: APK
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - run: npm ci
+      - run: npm approve-scripts esbuild || true
+      - name: Prebuild Android
+        run: npm run prebuild:android
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ''
+          EXPO_PUBLIC_PHONE_AUTH_ENABLED: 'false'
+          EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: ''
+
+      - name: Derle (release APK)
+        run: npm run apk:build
+
+      - name: Çıktıyı adlandır ve sağlama üret
+        run: |
+          set -euo pipefail
+          APK=apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          cp "$APK" "deva-${RELEASE_TAG}-release.apk"
+          sha256sum "deva-${RELEASE_TAG}-release.apk" > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          ls -lh "deva-${RELEASE_TAG}-release.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deva-${{ env.RELEASE_TAG }}-release-apk
+          path: |
+            deva-${{ env.RELEASE_TAG }}-release.apk
+            SHA256SUMS.txt
+          retention-days: 90
+
+      - name: GitHub Release oluştur ve yükle
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" \
+            "deva-${RELEASE_TAG}-release.apk" \
+            SHA256SUMS.txt \
+            --title "DEVA $RELEASE_TAG" \
+            --notes "Release APK: deva-${RELEASE_TAG}-release.apk (debug keystore imzalı; Play Store imzası için docs/RELEASE.md). Sağlama: SHA256SUMS.txt. Docker: ghcr.io/${{ github.repository }}:${RELEASE_TAG}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  docker:
+    name: Docker (GHCR)
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: GHCR girişi
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: İmajı derle ve pushla
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ env.RELEASE_TAG }}
+            ghcr.io/${{ github.repository }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+            EXPO_PUBLIC_SUPABASE_ANON_KEY=

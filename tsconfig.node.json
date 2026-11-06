@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": true,
+    "types": ["node"],
+    "allowJs": true,
+    "outDir": "dist/types"
+  },
+  "include": [
+    "supabase/functions/**/*.ts",
+    "supabase/functions/deno.d.ts",
+    "scripts/**/*.mjs",
+    "tests/**/*.ts",
+    "vitest.config.ts"
+  ]
+}

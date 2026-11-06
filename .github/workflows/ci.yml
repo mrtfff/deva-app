@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Approve native build scripts
+        run: npm approve-scripts esbuild || true
+
+      - name: Version consistency
+        run: npm run version:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Domain tests (vitest)
+        run: npm test
+
+      - name: Mobile tests (jest-expo)
+        run: npm run test --workspace @deva/mobile
+
+# CI'da Docker/Supabase stack'i başlatılmaz ve Edge Function'lar çalıştırılmaz:
+# kapsam saf mantık (kriz, triyaj, ölçek, kota, seri, SSE, LLM) ve mobil bileşen davranışıdır.
