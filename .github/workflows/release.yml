@@ -93,7 +93,7 @@ jobs:
           cat SHA256SUMS.txt
           ls -lh "deva-${RELEASE_TAG}-release.apk"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: deva-${{ env.RELEASE_TAG }}-release-apk
           path: |
