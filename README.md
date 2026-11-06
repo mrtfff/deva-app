@@ -194,6 +194,29 @@ Detaylı akış `docs/RELEASE.md`'dedir: sürüm bump → kapı kontrolleri →
 `vX.Y.Z` etiketi → otomatik Release (APK + `SHA256SUMS.txt` + Docker →
 GHCR). Üretim imzalaması (debug keystore dışı) bölümü de oradadır.
 
+## Telefonda APK'yı bulma (Release)
+
+Telefonda GitHub uygulamasında **Releases** sekmesini bulamazsanız:
+
+1. `github.com/mrtfff/deva-app` adresine gidin — repo ilintisinde **Releases**
+   (sağ panelde, Code/Issues/PR'lar yanında) seçeneği vardır.
+2. İlgili sürümün altından `deva-<sürüm>-release.apk` dosyasını indirin.
+3. İndirilen dosyayı açıp "bu kaynaktan kuruluma izin ver" uyarısına izin
+   vererek kurun.
+
+Alternatif (tek dokunuş): <https://github.com/mrtfff/deva-app/releases>
+
+Kısa yollar:
+
+- Normal sürüm: `v1.0.0` etiketi
+- Sadece UI görmek için (veritabanısız): `v1.0.0-demo` etiketi
+
+Korumak için: indirdiğiniz APK'nın SHA-256'sını `SHA256SUMS.txt` içindeki
+aynı adlı satırla karşılaştırın (`sha256sum deva-*.apk`).
+
+Not: Her iki APK aynı paket adını (`app.deva.mobile`) kullandığı için tek
+cihazda yan yana kurulamaz; birini kurup diğeri yerine geçirilmelidir.
+
 ## Lisans ve politika
 
 [LICENSE](LICENSE) · [CHANGELOG](CHANGELOG.md) · [CONTRIBUTING](CONTRIBUTING.md) · [SECURITY](SECURITY.md)
