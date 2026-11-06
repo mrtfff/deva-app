@@ -17,6 +17,8 @@ interface AuthContextValue {
   loading: boolean;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
+  updateDisplayName: (name: string) => Promise<boolean>;
+  updateEmail: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -68,6 +70,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void loadProfile();
   }, [session?.user, loadProfile]);
 
+  const updateDisplayName = useCallback(
+    async (name: string): Promise<boolean> => {
+      const userId = session?.user?.id;
+      if (!userId) return false;
+      const { error } = await supabase.from('profiles').update({ display_name: name }).eq('id', userId);
+      if (error) return false;
+      await loadProfile();
+      return true;
+    },
+    [session?.user?.id, loadProfile],
+  );
+
+  const updateEmail = useCallback(
+    async (email: string): Promise<void> => {
+      const { error } = await supabase.auth.updateUser({ email });
+      if (error) throw new Error(error.message);
+    },
+    [],
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user: session?.user ?? null,
@@ -79,8 +101,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase.auth.signOut();
         setProfile(null);
       },
+      updateDisplayName,
+      updateEmail,
     }),
-    [session, profile, loading, loadProfile],
+    [session, profile, loading, loadProfile, updateDisplayName, updateEmail],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,11 +1,11 @@
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../components/ThemeProvider';
-import { Card, Chip, PrimaryButton, SectionTitle } from '../../components/ui';
+import { Card, Chip, PrimaryButton, SectionTitle, inputStyle } from '../../components/ui';
 import { deleteAllMyData } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { cancelAllNotifications, syncAllNotifications } from '../../lib/notifications';
@@ -29,10 +29,15 @@ const THEME_MODES: { value: ThemeMode; label: string }[] = [
 export default function ProfileScreen() {
   const { theme, mode, setMode } = useTheme();
   const insets = useSafeAreaInsets();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, updateDisplayName, updateEmail } = useAuth();
   const { settings, update } = useSettings();
   const { notes } = useMemoryNotes();
   const [deleting, setDeleting] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [nameValue, setNameValue] = useState('');
+  const [emailValue, setEmailValue] = useState('');
+  const [error, setError] = useState('');
 
   /** Ayar değişimi önce DB'ye yazılır, sonra yerel bildirimler yeniden kurulur. */
   const applySettings = useCallback(
@@ -62,6 +67,37 @@ export default function ProfileScreen() {
     router.replace('/onboarding');
   }, [signOut]);
 
+  const saveName = useCallback(async () => {
+    const next = nameValue.trim();
+    if (next.length === 0 || next.length > 40) {
+      setError('İsim 1-40 karakter olmalı.');
+      return;
+    }
+    setError('');
+    const ok = await updateDisplayName(next);
+    if (!ok) {
+      setError('Kaydedilemedi. Lütfen tekrar dene.');
+      return;
+    }
+    setEditingName(false);
+  }, [nameValue, updateDisplayName]);
+
+  const saveEmail = useCallback(async () => {
+    const next = emailValue.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next)) {
+      setError('Geçerli bir e-posta adresi gir.');
+      return;
+    }
+    setError('');
+    try {
+      await updateEmail(next);
+    } catch {
+      setError('E-posta değiştirilemedi. Bağlantıyı kontrol edip tekrar dene.');
+      return;
+    }
+    setEditingEmail(false);
+  }, [emailValue, updateEmail]);
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: theme.colors.bg }}
@@ -72,8 +108,82 @@ export default function ProfileScreen() {
     >
       <SectionTitle theme={theme}>Hesap</SectionTitle>
       <Card theme={theme} style={styles.card}>
-        <InfoRow theme={theme} label="Görünen ad" value={profile?.display_name ?? 'İsmini eklemedin'} />
-        <InfoRow theme={theme} label="E-posta" value={user?.email ?? '—'} />
+        {error ? (
+          <Text style={[styles.errorText, { color: theme.colors.danger }]}>{error}</Text>
+        ) : null}
+        {editingName ? (
+          <View style={styles.editRow}>
+            <TextInput
+              value={nameValue}
+              onChangeText={setNameValue}
+              placeholder="Adını yaz"
+              maxLength={40}
+              autoCapitalize="words"
+              style={[inputStyle(theme), styles.editInput]}
+            />
+            <Pressable
+              onPress={() => void saveName()}
+              accessibilityRole="button"
+              style={[styles.saveChip, { backgroundColor: theme.colors.primary }]}
+            >
+              <Text style={[styles.saveText, { color: theme.colors.surface }]}>Kaydet</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => {
+              setError('');
+              setNameValue(profile?.display_name ?? '');
+              setEditingName(true);
+            }}
+            accessibilityRole="button"
+            style={styles.editableRow}
+          >
+            <View style={styles.editableText}>
+              <Text style={[styles.caption, { color: theme.colors.muted }]}>Görünen ad</Text>
+              <Text style={[styles.rowLabel, { color: theme.colors.text }]}>
+                {profile?.display_name ?? 'İsmini eklemedin'}
+              </Text>
+            </View>
+            <Ionicons name="create-outline" size={18} color={theme.colors.muted} />
+          </Pressable>
+        )}
+        {editingEmail ? (
+          <View style={styles.editRow}>
+            <TextInput
+              value={emailValue}
+              onChangeText={setEmailValue}
+              placeholder="E-posta"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={[inputStyle(theme), styles.editInput]}
+            />
+            <Pressable
+              onPress={() => void saveEmail()}
+              accessibilityRole="button"
+              style={[styles.saveChip, { backgroundColor: theme.colors.primary }]}
+            >
+              <Text style={[styles.saveText, { color: theme.colors.surface }]}>Kaydet</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => {
+              setError('');
+              setEmailValue(user?.email ?? '');
+              setEditingEmail(true);
+            }}
+            accessibilityRole="button"
+            style={styles.editableRow}
+          >
+            <View style={styles.editableText}>
+              <Text style={[styles.caption, { color: theme.colors.muted }]}>E-posta</Text>
+              <Text style={[styles.rowLabel, { color: theme.colors.text }]}>{user?.email ?? '—'}</Text>
+            </View>
+            <Ionicons name="create-outline" size={18} color={theme.colors.muted} />
+          </Pressable>
+        )}
         <InfoRow
           theme={theme}
           label="Mod"
@@ -304,6 +414,35 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     lineHeight: 22,
+  },
+  editRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  editInput: {
+    flex: 1,
+  },
+  editableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  editableText: {
+    flex: 1,
+    gap: 4,
+  },
+  saveChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  saveText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  errorText: {
+    fontSize: 13,
   },
   caption: {
     fontSize: 12,

@@ -9,6 +9,8 @@ import { seedFacilitiesIfEmpty } from './seed';
 
 const LOCAL_USER_ID = '00000000-0000-4000-8000-000000000001';
 
+let localEmail = 'yerel@deva.app';
+
 function localUser(): User {
   return {
     id: LOCAL_USER_ID,
@@ -16,7 +18,7 @@ function localUser(): User {
     user_metadata: {},
     aud: 'local',
     created_at: new Date(0).toISOString(),
-    email: 'yerel@deva.app',
+    email: localEmail,
   } as unknown as User;
 }
 
@@ -52,6 +54,11 @@ export const localAuth = {
     return { error: null };
   },
 
+  async updateUser(patch: { email?: string }): Promise<{ error: null }> {
+    if (patch.email !== undefined) localEmail = patch.email;
+    for (const listener of listeners) listener('USER_UPDATED', localSession());
+    return { error: null };
+  },
   onAuthStateChange(
     callback: (event: string, session: Session | null) => void,
   ): { data: { subscription: { unsubscribe: () => void } }; error: null } {
