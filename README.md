@@ -219,4 +219,4 @@ cihazda yan yana kurulamaz; birini kurup diğeri yerine geçirilmelidir.
 
 ## Lisans ve politika
 
-[LICENSE](LICENSE) · [CHANGELOG](CHANGELOG.md) · [CONTRIBUTING](CONTRIBUTING.md) · [SECURITY](SECURITY.md)
+[LICENSE](LICENSE) · [CHANGELOG](CHANGELOG.md) · [CONTRIBUTING](CONTRIBUTING.md)
